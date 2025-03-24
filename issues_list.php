@@ -150,6 +150,7 @@ $conn->close();
             $issue = $result->fetch_assoc();
             echo "<h2>Issue Details (Read-Only)</h2>";
             echo "<form>";
+            echo "<label>id:</label><input type='text' value='" . htmlspecialchars($issue['id']) . "' class='read-only' readonly><br>";
             echo "<label>Short Description:</label><input type='text' value='" . htmlspecialchars($issue['short_description']) . "' class='read-only' readonly><br>";
             echo "<label>Long Description:</label><textarea class='read-only' readonly>" . htmlspecialchars($issue['long_description']) . "</textarea><br>";
             echo "<label>Open Date:</label><input type='date' value='" . $issue['open_date'] . "' class='read-only' readonly><br>";
