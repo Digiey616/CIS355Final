@@ -43,11 +43,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $_SESSION['user_id'] = $id;
                 $_SESSION['user_email'] = $email_db;
                 $_SESSION['user_name'] = $fname . ' ' . $lname;
-                $_SESSION['is_admin'] = ($admin === '1'); // Assuming '1' indicates an admin
+                $_SESSION['is_admin'] = $admin; // Assuming '1' indicates an admin
+                
+
                 
                 // Redirect to the issues list page
                 header("Location: issues_list.php");
-                exit;
+                exit();
             } else {
                 // Incorrect password
                 $error_message = "Invalid email or password.";
@@ -140,6 +142,7 @@ $conn->close();
         </div>
         <button type="submit" class="btn">Login</button>
     </form>
+    <p><a href="Register.php">Register</a></p>
 </div>
 
 </body>
