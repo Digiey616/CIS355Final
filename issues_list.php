@@ -30,9 +30,13 @@ if ($conn->connect_error) {
 // Fetch issues from the database
 $persons_sql = "SELECT id, fname, lname FROM iss_persons ORDER BY lname ASC";
 $persons_result = $conn->query($persons_sql);
+$persons_stmt = $pdo->query($persons_sql);
+$persons = $persons_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $issues_sql = "SELECT * FROM iss_issues ORDER BY open_date DESC";
 $issues_result = $conn->query($issues_sql);
+$issues_stmt = $pdo->query($issues_sql);
+$issues = $issues_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
    
@@ -89,7 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             header("Location: issues_list.php"); 
             exit();
         }
-           
         $id = $_POST['id'];
         $short_description = trim($_POST['short_description']);
         $long_description = trim($_POST['long_description']);
@@ -108,11 +111,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     if (isset($_POST['delete_issue'])) {
         if( !( $_SESSION['is_admin'] == "Y" || $_SESSION['user_id'] == $_POST['per_id'] ) ) {
-            echo "<p>hi</p>";
             header("Location: issues_list.php"); 
             exit();
         }
-        echo "<p>hi</p>";
         $id = $_POST['id'];
         $delete_sql = "DELETE FROM iss_issues WHERE id=?";
         $delete_stmt = $pdo->prepare($delete_sql);
@@ -121,7 +122,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         header("Location: issues_list.php");
         exit();
     }
+    if (isset($_POST['update_comment'])) {
+        
+        $id = $_POST['id'];
+        $per_id = trim($_POST['per_id']);
+        $iss_id = trim($_POST['iss_id']);
+        $short_comment = trim($_POST['short_comment']);
+        $long_comment = trim($_POST['long_comment']);
+        $posted_date = trim($_POST['posted_date']);
 
+        $update_sql = "UPDATE iss_comments SET per_id=?, iss_id=?, short_comment=?, long_comment=?, posted_date=? WHERE id=?";
+        $update_stmt = $pdo->prepare($update_sql);
+        $update_stmt->execute([$per_id, $iss_id, $short_comment, $long_comment, $posted_date, $id]);
+        header("Location: issues_list.php");
+        exit();
+    }
+    if (isset($_POST['delete_comment'])) {
+        $id = $_POST['id'];
+        $delete_sql = "DELETE FROM iss_comments WHERE id=?";
+        $delete_stmt = $pdo->prepare($delete_sql);
+        $delete_stmt->execute([$id]);
+
+        header("Location: issues_list.php");
+        exit();
+    }
+    if (isset($_POST['create_comment'])) {
+        $per_id = $_POST['per_id'];
+        $iss_id = $_POST['iss_id'];
+        $short_comment = trim($_POST['short_comment']);
+        $long_comment = trim($_POST['long_comment']);
+        $posted_date = trim($_POST['posted_date']);
+
+        $create_sql = "INSERT INTO iss_comments (per_id, iss_id, short_comment, long_comment, posted_date) VALUES(?, ?, ?, ?, ?)";
+        $create_stmt = $pdo->prepare($create_sql);
+        $create_stmt->execute([$per_id, $iss_id, $short_comment, $long_comment, $posted_date]);
+        header("Location: issues_list.php");
+        exit();
+    }
 }
 
 ?>
@@ -193,9 +230,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
         <?php 
         if (( $_SESSION['is_admin'] == "Y" ) ) {
-            echo '<div class="button-container">
-            <a href="persons_list.php" class="add-button">P</a> <!-- Link to the form to add a new issue -->
-        </div>';
+            echo '<div class="button-container"><a href="persons_list.php" class="add-button">P</a> <!-- Link to the form to add a new issue --></div>';
             echo  '<div class="button-container">
             <a href="comments_list.php" class="add-button">C</a> <!-- Link to the form to add a new issue -->
         </div>';
@@ -286,6 +321,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                <input type="text" name="project" class="form-control mb-2">
        
                                                <label for="per_id">Person Responsible</label>
+                                               <?php
+                                               if(( $_SESSION['is_admin'] == "Y" )) { ?>
                                                <select name="per_id" class="form-control mb-3">
                                                    <option value="">-- Select Person --</option>
                                                    <?php while ($person = $persons_result->fetch_assoc()) { ?>
@@ -294,6 +331,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                        </option>
                                                    <?php } ?>
                                                </select>
+                                               <?php }
+                                               else { ?>
+                                                    <select name="per_id" class="fprm-control mb-3">
+                                                        <option value="<?= $_SESSION['user_id']; ?>">
+                                                            <?= htmlspecialchars($_SESSION['user_name']) . ' (' . $_SESSION['user_id'] . ') '; ?>
+                                                        </option>
+                                               <?php } ?>
        
                                                <label for="pdf_attachment">PDF</label>
                                                <input type="file" name="pdf_attachment" class="form-control mb-2"
@@ -330,13 +374,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                            <?php
                                                $com_iss_id = $row['id'];
                                                // Fetch comments this particular issue: gpcorser
-                                               $comments_sql = "SELECT * FROM iss_comments, iss_persons 
+                                               $comments_sql = "SELECT * FROM iss_persons, iss_comments 
                                                    WHERE iss_id = $com_iss_id
                                                    AND `iss_persons`.id = per_id
                                                    ORDER BY posted_date DESC";
                                                $comments_result = $conn->query($comments_sql);
+                                               $comments_stmt = $pdo->query($comments_sql);
+                                               $comments = $comments_stmt->fetchAll(PDO::FETCH_ASSOC);
                                                
                                            ?>
+                                           <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCommentModal">+</button>
                 <?php  while ($comment = $comments_result->fetch_assoc()) { ?>
                     <div style="font-family: monospace;">
                         <span style="display:inline-block; width: 180px;">
@@ -349,15 +396,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <?= htmlspecialchars($comment['posted_date']) ?>
                         </span>
                         <span style="display:inline-block; width: 150px;">
-                            <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#readIssue<?= $comment['id']; ?>">R</button>
-                            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#updateIssue<?= $comment['id']; ?>">U</button>
-                            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteIssue<?= $comment['id']; ?>">D</button>
+                            <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#readComment<?= $comment['id']; ?>">R</button>
+                            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#updateComment<?= $comment['id']; ?>">U</button>
+                            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteComment<?= $comment['id']; ?>">D</button>
                         </span>
                     </div>
-                <?php } ?>
-       
-       
-                                           
+                    <?php } ?>           
                                        </div>
                                    </div>
                                </div>
@@ -388,8 +432,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                <input type="text" name="org" class="form-control mb-2" value="<?= $row['org']; ?>">
                                                <label for="project">Project</label>
                                                <input type="text" name="project" class="form-control mb-2" value="<?= $row['project']; ?>">
-                                               <label for="per_id">Person Responsible</label>
+                                               <?php if (( $_SESSION['is_admin'] == "Y" )) { ?>
+                                                <label for="per_id">Person Responsible</label>
                                                <input type="number" name="per_id" class="form-control mb-2" value="<?= $row['per_id']; ?>">
+                                               <?php } 
+                                               else { ?>
+                                                <input type="hidden" name="per_id" value="<?= $_SESSION['user_id']; ?>">
+                                             <?php  }?>
                                                <button type="submit" name="update_issue" class="btn btn-primary">Save Changes</button>
                                            </form>
                                        </div>
@@ -426,7 +475,118 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                        </div>
                                    </div>
                                </div>
+                            </div>
+                            <?php foreach ($issues as $issue) : ?>
+                            <div class="modal fade" id="addCommentModal<?= $issue['id']; ?>" tabindex="-1">
+                               <div class="modal-dialog">
+                                   <div class="modal-content">
+                                       <div class="modal-header bg-success text-white">
+                                           <h5 class="modal-title">Add New Comment</h5>
+                                           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                       </div>
+                                       <div class="modal-body">
+                                           <form method="POST" enctype="multipart/form-data">
+                                               <label for="per_id">Person ID</label>
+                                               <select name="per_id" class="form-control mb-3">
+                                                   <option value="">-- Select Person --</option>
+                                                   <?php foreach ($persons as $person) : ?>
+                                                       <option value="<?= $issue['id']; ?>">
+                                                           <?= htmlspecialchars($person['lname'] . ', ' . $person['fname']); ?>
+                                                       </option>
+                                                       <?php endforeach ?>
+                                                </select>
+
+                                               <input type=text name=iss_id value="<?= $issue['id']; ?>">>
+                                               <label for="short_comment">Short Comment</label>
+                                               <input type="text" name="short_comment" class="form-control mb-2" required>
+       
+                                               <label for="long_comment">Long Comment</label>
+                                               <input type="text" name="long_comment" class="form-control mb-2" required>
+       
+                                               <label for="posted_date">Posted Date</label>
+                                               <input type="date" name="posted_date" class="form-control mb-2">
+                                               <button type="submit" name="create_comment" class="btn btn-success">Add Comment</button>
+                                           </form>
+                                       </div>
+                                   </div>
+                               </div>
                            </div>
+                           <?php endforeach ?>
+                            <?php foreach ($comments as $comment) : ?>
+                                <div class="modal fade" id="readComment<?= $comment['id']; ?>" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Comment Details</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p><strong>ID:</strong> <?= htmlspecialchars($comment['id']); ?></p>
+                                                <p><strong>Person ID:</strong> <?= htmlspecialchars($comment['per_id']); ?></p>
+                                                <p><strong>Issue ID:</strong> <?= htmlspecialchars($comment['iss_id']); ?></p>
+                                                <p><strong>Short Comment:</strong> <?= htmlspecialchars($comment['short_comment']); ?></p>
+                                                <p><strong>Long Comment:</strong> <?= htmlspecialchars($comment['long_comment']); ?></p>
+                                                <p><strong>Posted Date:</strong> <?= htmlspecialchars($comment['posted_date']); ?></p> 
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+       
+                           <!-- Update Modal -->
+                           <div class="modal fade" id="updateComment<?= $comment['id']; ?>" tabindex="-1">
+                               <div class="modal-dialog">
+                                   <div class="modal-content">
+                                       <div class="modal-header">
+                                           <h5 class="modal-title">Update Comment</h5>
+                                           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                       </div>
+                                       <div class="modal-body">
+                                           <form method="POST">
+                                                <label for="per_id">Person ID</label>
+                                                <input type="number" name="per_id"  class="form-control mb-2" value="<?= $comment['per_id']; ?>">
+                                                <label for="iss_id">Issue ID</label>
+                                                <input type="number" name="iss_id"  class="form-control mb-2" value="<?= $comment['iss_id']; ?>">
+                                                <input type="hidden" name="id" value="<?= $comment["id"]; ?>">
+                                                <label for="short_comment">Short Comment</label required>
+                                                <input type="text" name="short_comment" class="form-control mb-2" value="<?= $comment['short_comment']; ?>" required>
+                                                <label for="long_comment">Long Comment</label>
+                                                <input type="text" name="long_comment" class="form-control mb-2" value="<?= $comment['long_comment']; ?>" required>
+                                                <label for="posted_date">Posted Date</label>
+                                                <input type="date" name="posted_date" class="form-control mb-2" value="<?= $comment['posted_date']; ?>">
+                                                <button type="submit" name="update_comment" class="btn btn-primary">Save Comment</button>
+                                           </form>
+                                       </div>
+                                   </div>
+                               </div>
+                           </div>
+       
+                           <!-- Delete Modal -->
+                           <div class="modal fade" id="deleteComment<?= $comment['id']; ?>" tabindex="-1">
+                               <div class="modal-dialog">
+                                   <div class="modal-content">
+                                       <div class="modal-header bg-danger text-white">
+                                           <h5 class="modal-title">Confirm Deletion</h5>
+                                           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                       </div>
+                                       <div class="modal-body">
+                                           <p>Are you sure you want to delete this comment?</p>
+                                           <p><strong>ID:</strong> <?= htmlspecialchars($comment['id']); ?></p>
+                                           <p><strong>Person ID:</strong> <?= htmlspecialchars($comment['per_id']); ?></p>
+                                           <p><strong>Issue ID:</strong> <?= htmlspecialchars($comment['iss_id']); ?></p>
+                                           <p><strong>Short Comment:</strong> <?= htmlspecialchars($comment['short_comment']); ?></p>
+                                           <p><strong>Long Comment:</strong> <?= htmlspecialchars($comment['long_comment']); ?></p>
+                                           <p><strong>Posted Date:</strong> <?= htmlspecialchars($comment['posted_date']); ?></p>
+       
+                                           <form method="POST">
+                                               <input type="hidden" name="id" value="<?= $comment['id']; ?>">
+                                               <button type="submit" name="delete_comment" class="btn btn-danger">Delete</button>
+                                               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                           </form>
+                                       </div>
+                                   </div>
+                               </div>
+                           </div>
+                           <?php endforeach; ?>
            <?php     }
             }
              else {
@@ -440,4 +600,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-<?php $conn->close(); ?>
+<?php $conn->close();
+$pdo = null;
+ ?>
