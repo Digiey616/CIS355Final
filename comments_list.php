@@ -10,7 +10,7 @@ if ($_SESSION['is_admin'] != 'Y') {
     exit();
 }
 // Database connection (update with your credentials)
-require 'C:\xampp\htdocs\database.php';
+require 'C:\xampp\htdocs\database\database.php';
 
 // Create connection
 $conn = new mysqli($servername, $username, $password, $dbname);

@@ -1,7 +1,7 @@
 <?php
 // Start the session to store session variables
 session_start();
-require 'C:\xampp\htdocs\database.php';
+require 'C:\xampp\htdocs\database\database.php';
 
 // Create connection
 $conn = new mysqli($servername, $username, $password, $dbname);

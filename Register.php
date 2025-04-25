@@ -1,6 +1,6 @@
 <?php
     session_start();
-    require 'C:\xampp\htdocs\database.php';
+    require 'C:\xampp\htdocs\database\database.php';
     try {
         $connString = "mysql:host=localhost;dbname=cis355";
         $pdo = new PDO($connString, $username, $password);
